@@ -1,0 +1,125 @@
+-- 1. What is the total amount each customer spent at the restaurant?
+-- 2. How many days has each customer visited the restaurant?
+-- 3. What was the first item from the menu purchased by each customer?
+-- 4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+-- 5. Which item was the most popular for each customer?
+-- 6. Which item was purchased first by the customer after they became a member?
+-- 7. Which item was purchased just before the customer became a member?
+-- 8. What is the total items and amount spent for each member before they became a member?
+-- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+-- 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+
+-- Example Query:
+/* (1)
+SELECT a.customer_id,SUM(b.price) AS TOT_AMT FROM
+sales a 
+JOIN menu b
+on a.product_id = b.product_id
+GROUP BY a.customer_id  */
+
+/* (2)     
+ SELECT customer_id, COUNT(DISTINCT(order_date)) from sales
+ GROUP BY customer_id */
+ 
+/* (3)
+with rank_info AS (select a.customer_id,a.order_date,a.product_id,b.product_name,
+DENSE_RANK() OVER(PARTITION BY customer_id ORDER BY order_date ASC) as RNK FROM sales a
+LEFT JOIN menu b
+ON a.product_id = b.product_id)
+SELECT customer_id,product_name from rank_info
+WHERE RNK=1   */
+
+/* (4)
+WITH T1 AS (SELECT product_id FROM sales
+GROUP BY product_id
+ORDER BY count(product_id) DESC
+LIMIT 1)
+SELECT T2.product_name
+from T1
+LEFT JOIN menu AS T2
+ON T1.product_id = T2.product_id  */
+
+/* (5)
+with T1 AS (SELECT a.customer_id, a.product_id,b.product_name, 
+DENSE_RANK() OVER(PARTITION BY customer_id ORDER BY COUNT(a.product_id) DESC) AS R
+FROM sales a
+left join 
+menu b
+on a.product_id = b.product_id
+GROUP BY a.customer_id, a.product_id,b.product_name)
+SELECT customer_id , product_name FROM T1  
+WHERE R=1   */
+
+/*  (6)
+WITH T1 AS(SELECT a.* , RANK() OVER(PARTITION BY a.customer_id order by a.order_date ASC) as R
+from sales a
+JOIN members b
+on a.customer_id = b.customer_id AND a.order_date>=b.join_date)
+SELECT customer_id,T2.product_name from T1
+JOIN menu as T2
+ON T1.product_id = T2.product_id
+WHERE R=1
+ORDER BY customer_id       */
+
+/* (7)
+WITH T1 AS(SELECT a.* ,RANK() OVER(PARTITION BY a.customer_id order by a.order_date DESC) as R
+from sales a 
+JOIN members b
+on a.customer_id = b.customer_id AND a.order_date<b.join_date)
+SELECT customer_id,T2.product_name from T1
+JOIN menu as T2
+ON T1.product_id = T2.product_id
+WHERE R=1
+ORDER BY customer_id   */
+
+/*  (8)
+SELECT a.customer_id,COUNT(a.product_id),sum(c.price)
+from sales a 
+join members b 
+on a.customer_id = b.customer_id AND a.order_date<b.join_date
+join menu c
+on a.product_id = c.product_id 
+group by a.customer_id   */
+
+/*  (9)
+SELECT a.customer_id,
+SUM(CASE 
+ WHEN a.product_id=1 THEN 20*(b.price)
+ ELSE 10*(b.price) END) AS TOT_PRICE
+from sales a
+join menu b
+on a.product_id=b.product_id
+GROUP BY a.customer_id   */
+
+/*   --------------Bonus Questions-----------------------    */
+
+/* (1)
+Select a.customer_id,a.order_date,b.product_name,b.price,
+(CASE 
+ WHEN a.order_date>=c.join_date THEN "Y"
+ ELSE "N" END)AS member
+ FROM 
+ sales a
+ join menu b
+ ON a.product_id = b.product_id
+ LEFT join members c
+ ON a.customer_id = c.customer_id
+ ORDER BY a.customer_id,a.order_date,b.product_name   */
+ 
+/*  (2)
+WITH T1 AS (Select a.customer_id,a.order_date,b.product_name,b.price,
+(CASE 
+ WHEN a.order_date>=c.join_date THEN "Y"
+ ELSE "N" END)AS member
+ FROM 
+ sales a
+ join menu b
+ ON a.product_id = b.product_id
+ LEFT join members c
+ ON a.customer_id = c.customer_id
+ ORDER BY a.customer_id,a.order_date,b.product_name)
+ SELECT T1.*,
+ (CASE 
+  WHEN T1.member = "Y" THEN DENSE_RANK() OVER (PARTITION BY T1.customer_id ORDER BY T1.order_date ASC)
+  ELSE "NULL" END) AS ranking
+  FROM T1           */ 
