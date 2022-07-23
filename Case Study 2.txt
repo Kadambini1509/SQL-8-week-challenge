@@ -1,0 +1,211 @@
+------------------------------CASE STUDY 2-----------------------------------
+*****CLEANING DATA**********
+drop table if exists new_customer_orders;
+create table new_customer_orders as
+(select order_id,customer_id,pizza_id,
+case 
+when exclusions is null or exclusions like "null" then null
+when exclusions = '' then null
+else exclusions 
+end as exclusions,
+case 
+when extras is null or extras like "null" then null
+when extras = '' then null
+else extras
+end as extras,order_time
+from customer_orders);
+
+drop table if exists new_runner_orders;
+ 
+# Creating a new cleaned table with null values and no other blank or NaN like values
+create table new_runner_orders as
+ (select order_id,runner_id,
+ case
+ when pickup_time is null or pickup_time like "null" then null
+ else pickup_time 
+ end as pickup_time,
+ case
+ when distance is null or distance like "null" then null 
+ when distance like "%km" then trim(trailing "km" from distance)
+ else distance 
+ end as distance,
+ case
+ when duration is null or duration like "null" then null
+ when duration like "%mins" then trim(trailing "mins" from duration)
+ when duration like "%minute" then trim(trailing "minute" from duration)
+ when duration like "%minutes" then trim(trailing "minutes" from duration)
+ else duration
+ end as duration,
+ case 
+ when cancellation is null or cancellation like "null" then null
+ when cancellation = '' then null
+ else cancellation
+ end as cancellation 
+ from runner_orders);
+ 
+ ALTER TABLE new_runner_orders
+change column pickup_time pickup_time datetime,
+CHANGE COLUMN distance distance decimal(10,2),
+change column duration duration int
+
+************PIZZA METRICS***********
+/*  (1)
+select COUNT(pizza_id) AS TOT_ORDER from new_customer_orders; */
+
+/* (2) 
+SELECT count(distinct(order_id)) from new_customer_orders */
+
+/* (3)
+select runner_id,count(order_id)
+from new_runner_orders
+where cancellation is null
+group by runner_id  */
+
+/*  (4)
+select c.pizza_name,count(a.order_id)
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+join pizza_names c
+on a.pizza_id=c.pizza_id
+where b.distance is not null
+group by c.pizza_name     */
+
+/* (5)
+select a.customer_id,b.pizza_name,count(a.pizza_id)
+from new_customer_orders a
+join pizza_names b
+on a.pizza_id = b.pizza_id
+group by a.customer_id, b.pizza_name
+order by customer_id          */
+
+/* (6) select count(a.pizza_id)
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+where b.distance is not null
+group by a.order_id
+order by count(pizza_id) desc
+limit 1   */
+
+/*  (7)
+select a.customer_id, 
+sum(case
+ when a.exclusions is not null or a.extras is not null then 1
+ WHEN a.exclusions is not null and a.extras is not null then 1
+ else 0 end) as Changes,
+ sum(CASE
+ WHEN a.exclusions is null and a.extras is null then 1
+ else 0 END) AS N_Change
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+where b.distance is not null
+group by a.customer_id    */
+
+/* (8)
+select count(a.pizza_id)
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+where a.exclusions is not null and a.extras is not null and b.distance is not null   */
+
+/* (9)
+select HOUR(order_time) as hours, count(pizza_id)
+from new_customer_orders
+group by hours
+order by hours   */
+
+/* (10)
+select dayname(order_time) as week_day, count(order_id)
+from new_customer_orders
+group by week_day   
+order by week_day asc  */
+
+******************Runner AND Customer Experience**********************
+/*(1)
+select (week(registration_date,1)+1) as week_num,count(runner_id)
+from runners
+group by week_num  */
+
+/* (2)
+select a.runner_id,
+avg(time_to_sec(timediff(pickup_time,order_time))/60) AS time_taken
+from new_runner_orders a
+join new_customer_orders b
+on a.order_id = b.order_id
+group by runner_id   */
+
+/* (4)
+select a.customer_id,avg(b.distance) as avg_dist_travelled
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+group by a.customer_id   */
+
+/*  (5)
+select (max(duration)-min(duration)) as difference from new_runner_orders  */
+
+/*  (6)
+select runner_id,avg(distance/(duration/60)) as speed
+from new_runner_orders
+where distance is not null and duration is not null
+group by runner_id 
+order by runner_id  */
+
+/* (7)
+select round(100*sum(case when distance is null then 0 else 1 end )/count(*)) as percentage,runner_id from new_runner_orders
+group by runner_id */
+
+/*--------------3.Ingredient optimisation---------*/
+
+/* (1)
+select pizza_id,toppings, topping.value 
+from pizza_recipes CROSS APPLY STRING_SPLIT(toppings, ',') as topping */
+
+/*--------------4.pricings and ratings---------*/
+
+/* (1)
+SELECT sum(case
+           when a.pizza_id =1 then 12
+           when a.pizza_id =2 then 10 end) as price
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+where b.cancellation is null   */
+
+/* (2)
+SELECT sum(case
+           when pizza_id =1 and extras is null then 12
+           when pizza_id =1 and extras is not null then 13
+           when pizza_id =2 and extras is null then 10
+           when pizza_id =2 and extras is not null then 11 end) as price
+from new_customer_orders a
+join new_runner_orders b
+on a.order_id = b.order_id
+where b.cancellation is null */
+
+/*  (3)
+create table runner_ratings (order_id integer,rating integer,detail varchar(50));
+insert into runner_ratings values (1,4,'good')
+ #       (2,5,'very good'),
+ #       (3,2,'bad'),
+ #       (4,3,'moderate'),
+ #       (5,3'moderate'),
+ #       (7,4,'good'),
+ #       (8,1,'very bad'),
+  #      (10,4,'good')
+ select order_id,rating,detail from runner_ratings  */
+ 
+/* (5)
+SELECT sum(case
+           when a.pizza_id =1 then 12
+           when a.pizza_id =2 then 10 end) - (sum(b.distance)*0.3) AS price
+           from new_customer_orders a
+           join new_runner_orders b
+           on a.order_id = b.order_id
+           where b.cancellation is null  */
+
+/*----------------------Bonus question-------------------*/
+insert into pizza_names values(3,'supreme')
+insert into pizza_recipes values(3,(SELECT GROUP_CONCAT(topping_id SEPARATOR ', ') FROM pizza_toppings))
