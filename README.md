@@ -50,3 +50,6 @@ The final members table captures the join_date when a customer_id joined the bet
 customer_id	join_date  <br />
 A	2021-01-07  <br />
 B	2021-01-09 <br />
+
+
+# Case Study 2- Pizza Runner
